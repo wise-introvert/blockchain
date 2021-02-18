@@ -1,17 +1,42 @@
-const add: (...numbers: number[]) => number = (
-  ...numbers: number[]
-): number => {
-  let sum: number = 0;
-  numbers.forEach((n: number) => (sum = sum + n));
+import { Blockchain, Block } from ".";
 
-  return sum;
-};
+describe("Blockchain", () => {
+  let blockchain: Blockchain;
+  let genesisBlockRawMaterial: Pick<
+    Block,
+    "hash" | "previousBlockHash" | "nonce"
+  > = {
+    nonce: Math.random(),
+    hash: "abc",
+    previousBlockHash: "def",
+  };
 
-describe("add", () => {
-  test("1 + 1 = 2", () => {
-    expect(add(1, 1)).toBe(2);
+  beforeAll(() => {
+    blockchain = new Blockchain();
   });
-  test("2 + 3 + 19 = 24", () => {
-    expect(add(2, 3, 19)).toBe(24);
+
+  it("adds the given new block to the chain", () => {
+    const addedBlock: Block = blockchain.createNewBlock(
+      genesisBlockRawMaterial.nonce,
+      genesisBlockRawMaterial.previousBlockHash,
+      genesisBlockRawMaterial.hash
+    );
+
+    expect(addedBlock.index).toBeTruthy();
+    expect(addedBlock.timestamp).toBeTruthy();
+    expect(addedBlock.nonce).toEqual(genesisBlockRawMaterial.nonce);
+    expect(addedBlock.hash).toEqual(genesisBlockRawMaterial.hash);
+    expect(addedBlock.previousBlockHash).toEqual(
+      genesisBlockRawMaterial.previousBlockHash
+    );
+  });
+
+  it("returns the last block when pop() method is called", () => {
+    const lastBlock: Block = blockchain.getLastBlock();
+    expect(lastBlock.nonce).toEqual(genesisBlockRawMaterial.nonce);
+    expect(lastBlock.hash).toEqual(genesisBlockRawMaterial.hash);
+    expect(lastBlock.previousBlockHash).toEqual(
+      genesisBlockRawMaterial.previousBlockHash
+    );
   });
 });
