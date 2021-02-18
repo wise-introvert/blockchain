@@ -1,7 +1,7 @@
 import { SHA256 } from "crypto-js";
 import { pick } from "lodash";
 
-import { Transaction, Block, Blockchain, IBlockchain } from ".";
+import { Transaction, Block, Blockchain, IBlockchain } from "./blockchain";
 
 const getRandomHash: () => string = (): string => {
   return SHA256(Math.random().toString()).toString();
