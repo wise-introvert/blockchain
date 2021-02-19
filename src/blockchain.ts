@@ -1,4 +1,5 @@
 import { SHA256 } from "crypto-js";
+import { pick } from "lodash";
 
 export interface Transaction {
   amount: number;
@@ -6,12 +7,6 @@ export interface Transaction {
   recipient: string;
   timestamp: Date | number;
 }
-
-export interface UnMinedBlock
-  extends Pick<Block, "transactions" | "previousBlockHash" | "nonce"> {}
-
-export interface ProofOfWorkBlockData
-  extends Pick<Block, "transactions" | "previousBlockHash"> {}
 
 export interface Block {
   transactions: Transaction[];
@@ -22,12 +17,20 @@ export interface Block {
   index: number;
 }
 
+export interface UnMinedBlock
+  extends Pick<
+    Block,
+    "transactions" | "previousBlockHash" | "nonce" | "timestamp" | "index"
+  > {}
+
+export interface ProofOfWorkBlockData
+  extends Pick<
+    Block,
+    "transactions" | "previousBlockHash" | "timestamp" | "index"
+  > {}
+
 export interface IBlockchain {
-  createNewBlock: (
-    _nonce: number,
-    _previousBlockHash: string,
-    _hash: string
-  ) => Block;
+  mine: () => Block;
   getChain: () => Block[];
   getLastBlock: () => Block;
   createNewTransaction: (
@@ -35,8 +38,8 @@ export interface IBlockchain {
     _sender: string,
     _recipient: string
   ) => number;
-  hashBlockData: (block: UnMinedBlock) => string;
-  proofOfWork: (blockData: ProofOfWorkBlockData) => number;
+  hashBlockData: (data: string | number | object) => string;
+  proofOfWork: (blockData: Omit<Block, "hash" | "nonce">) => number;
 }
 
 export class Blockchain implements IBlockchain {
@@ -49,7 +52,7 @@ export class Blockchain implements IBlockchain {
     this.pendingTransactions = [];
 
     // create genesis block
-    this.createNewBlock(100, "0", "0");
+    this.mine();
   }
 
   /**
@@ -59,18 +62,23 @@ export class Blockchain implements IBlockchain {
    * @param {string} _previousBlockHas - hash of the preceeding block (|| the most recent block)
    * @param {number} _hash - hash of the new block
    */
-  createNewBlock = (
-    _nonce: number,
-    _previousBlockHash: string,
-    _hash: string
-  ): Block => {
-    const block: Block = {
+  mine = (): Block => {
+    const previousBlockHash: string =
+      this.chain.length === 0 ? "0" : this.getLastBlock().hash;
+
+    const prematureBlock: Omit<Block, "hash" | "nonce"> = {
       transactions: this.pendingTransactions,
-      nonce: _nonce,
-      hash: _hash,
-      previousBlockHash: _previousBlockHash,
       timestamp: Date.now(),
       index: this.chain.length + 1,
+      previousBlockHash,
+    };
+
+    const nonce: number = this.proofOfWork(prematureBlock);
+
+    const block: Block = {
+      ...prematureBlock,
+      hash: this.hashBlockData({ ...prematureBlock, nonce }),
+      nonce,
     };
 
     this.chain.push(block);
@@ -122,29 +130,22 @@ export class Blockchain implements IBlockchain {
     return this.getLastBlock().index + 1;
   };
 
-  hashBlockData = (blockData: UnMinedBlock): string => {
-    return SHA256(JSON.stringify(blockData)).toString();
+  hashBlockData = (data: string | number | object): string => {
+    return SHA256(JSON.stringify(data)).toString();
   };
 
   /**
    * @description Generate nonce value based on block data and target pow
    *
-   * @param {ProofOfWorkBlockData} block - block that'll be used to generate the nonce
+   * @param { Omit<Block, "hash"> } block - block that'll be used to generate the nonce
    *
    * @return {number} nonce - the mined nonce value
    */
-  proofOfWork = (block: ProofOfWorkBlockData): number => {
+  proofOfWork = (block: Omit<Block, "hash" | "nonce">): number => {
     let nonce: number = 0;
-    console.log({ reg: `/^(${this.powTarget})[^0](.*)/gi` });
-
     while (true) {
       const hash: string = this.hashBlockData({ ...block, nonce });
-      console.log({
-        nonce,
-        start: hash.substr(0, 10),
-      });
       if (this.powTarget.test(hash)) {
-        console.log({ found: { nonce, hash } });
         return nonce;
       }
       nonce = nonce + 1;
