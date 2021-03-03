@@ -5,9 +5,17 @@
   "author": "Fardeen Panjwani",
   "license": "MIT",
   "scripts": {
-    "start:dev": "nodemon .",
+    "start:dev": "concurrently \"yarn nodeOne\" \"yarn nodeTwo\" \"yarn nodeThree\" \"yarn nodeFour\" \"yarn nodeFive\" \"yarn nodeSix\" \"yarn nodeSeven\"",
+    "nodeOne": "ts-node src/index.ts 3000",
+    "nodeTwo": "ts-node src/index.ts 3001",
+    "nodeThree": "ts-node src/index.ts 3002",
+    "nodeFour": "ts-node src/index.ts 3003",
+    "nodeFive": "ts-node src/index.ts 3004",
+    "nodeSix": "ts-node src/index.ts 3005",
+    "nodeSeven": "ts-node src/index.ts 3006",
     "mock": "ts-node src/mock.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "start": "nodemon ."
   },
   "devDependencies": {
     "@types/crypto-js": "^4.0.1",
@@ -17,6 +25,7 @@
     "@types/node": "^14.14.28",
     "@types/uuid": "^8.3.0",
     "@typescript-eslint/eslint-plugin": "^4.15.1",
+    "concurrently": "^5.3.0",
     "cz-conventional-changelog": "3.3.0",
     "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^14.2.1",
@@ -30,6 +39,7 @@
     }
   },
   "dependencies": {
+    "axios": "^0.21.1",
     "crypto-js": "^4.0.0",
     "express": "^4.17.1",
     "http-status-codes": "^2.1.4",

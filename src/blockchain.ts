@@ -1,5 +1,11 @@
 import { SHA256 } from "crypto-js";
-import { pick } from "lodash";
+
+const _currentNodeURL: string = `${
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:"
+    : "http://localhost:"
+}${process.argv[2]}`;
+const powTarget: RegExp = /^(0000)[^0](.*)/gi;
 
 export interface Transaction {
   amount: number;
@@ -40,16 +46,22 @@ export interface IBlockchain {
   ) => number;
   hashBlockData: (data: string | number | object) => string;
   proofOfWork: (blockData: Omit<Block, "hash" | "nonce">) => number;
+  updateNetwork: (newNodeURL: string) => string[];
+  currentNodeURL: string;
+  network: string[];
 }
 
 export class Blockchain implements IBlockchain {
   private chain: Block[];
   private pendingTransactions: Transaction[];
-  private powTarget: RegExp = /^(0000)[^0](.*)/gi;
+  public currentNodeURL: string;
+  public network: string[];
 
   constructor() {
     this.chain = [];
     this.pendingTransactions = [];
+    this.currentNodeURL = _currentNodeURL;
+    this.network = [];
 
     // create genesis block
     this.mine();
@@ -145,10 +157,15 @@ export class Blockchain implements IBlockchain {
     let nonce: number = 0;
     while (true) {
       const hash: string = this.hashBlockData({ ...block, nonce });
-      if (this.powTarget.test(hash)) {
+      if (powTarget.test(hash)) {
         return nonce;
       }
       nonce = nonce + 1;
     }
+  };
+
+  updateNetwork = (newNodeURL: string): string[] => {
+    this.network?.push(newNodeURL);
+    return this.network as string[];
   };
 }
