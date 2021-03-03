@@ -164,6 +164,13 @@ export class Blockchain implements IBlockchain {
     }
   };
 
+  /**
+   * @description add new network node to current blockchain's network array
+   *
+   * @param { string } newNodeURL - node to be added to the network
+   *
+   * @return { string[] } updated network array
+   */
   updateNetwork = (newNodeURL: string): string[] => {
     this.network?.push(newNodeURL);
     return this.network as string[];
