@@ -3,6 +3,8 @@ import express, { Application, Request, Response } from "express";
 import { StatusCodes } from "http-status-codes";
 import axios, { AxiosResponse } from "axios";
 import { v4 } from "uuid";
+import { isEmpty } from "lodash";
+import morgan from "morgan";
 
 import { Block, Blockchain, IBlockchain, Transaction } from "./blockchain";
 
@@ -12,12 +14,47 @@ const thisNodeAddress: string = SHA256(v4()).toString();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(morgan("dev"));
 
 const blockchain: IBlockchain = new Blockchain();
 
 interface BulkNetworkRegistrationResponse {
   success: boolean;
 }
+
+app.get(
+  "/blockchain/genisis",
+  async (_, res: Response<{ block: Block }>): Promise<void> => {
+    const genisis: Block = blockchain.mine();
+    let promises: Promise<AxiosResponse<any>>[] = [];
+
+    [...blockchain.network, blockchain.currentNodeURL].map(
+      (node: string): void => {
+        promises.push(
+          axios.post(
+            `${node}/blockchain/mine`,
+            {
+              block: genisis,
+            },
+            {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          )
+        );
+      }
+    );
+
+    await Promise.all(promises);
+    res
+      .status(StatusCodes.CREATED)
+      .json({
+        block: genisis,
+      })
+      .end();
+  }
+);
 
 app.get(
   "/blockchain/chain",
@@ -34,7 +71,6 @@ app.post(
     req: Request<{ transaction: Transaction }>,
     res: Response<{ blockIndex: number }>
   ): void => {
-    console.log(`registering new transaction ${req.body.transaction.id}`);
     // register the new transaction
     const blockIndex: number = blockchain.registerNewTransaction(
       req.body.transaction
@@ -82,26 +118,69 @@ app.post(
     res
       .status(StatusCodes.ACCEPTED)
       .json({
-        blockIndex: blockchain.getLastBlock().index + 1,
+        blockIndex:
+          (isEmpty(blockchain.getLastBlock())
+            ? { index: 0 }
+            : blockchain.getLastBlock()
+          ).index + 1,
       })
       .end();
   }
 );
 
 app.get(
-  "/blockchain/mine",
-  (req: Request, res: Response<{ block: Block }>): void => {
-    // reward
+  "/blockchain/mine/broadcast",
+  async (
+    req: Request<{}>,
+    res: Response<{ chain: Block[] }>
+  ): Promise<void> => {
+    // prepare reward
     blockchain.createNewTransaction(12.5, "00", thisNodeAddress);
 
-    // mine
+    // mine the new block
     const newBlock: Block = blockchain.mine();
 
-    // response
+    let broadcastPromises: Promise<{ chain: Block[] }>[] = [];
+
+    // broadcast newly mined block
+    [...blockchain.network, blockchain.currentNodeURL].map(
+      (node: string): void => {
+        broadcastPromises.push(
+          axios.post(
+            `${node}/blockchain/mine`,
+            {
+              block: newBlock,
+            },
+            {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          )
+        );
+      }
+    );
+
+    await Promise.all(broadcastPromises);
     res
       .status(StatusCodes.CREATED)
       .json({
-        block: newBlock,
+        chain: blockchain.getChain(),
+      })
+      .end();
+  }
+);
+
+app.post(
+  "/blockchain/mine",
+  (req: Request<{ block: Block }>, res: Response<{ chain: Block[] }>): void => {
+    // push the new block into the chain
+    blockchain.registerBlock(req.body.block);
+
+    res
+      .status(StatusCodes.ACCEPTED)
+      .json({
+        chain: blockchain.getChain(),
       })
       .end();
   }

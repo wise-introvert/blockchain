@@ -1,5 +1,6 @@
 import { SHA256 } from "crypto-js";
 import { v4 } from "uuid";
+import { isEmpty } from "lodash";
 
 const _currentNodeURL: string = `${
   process.env.NODE_ENV === "development"
@@ -39,6 +40,7 @@ export interface ProofOfWorkBlockData
 
 export interface IBlockchain {
   mine: () => Block;
+  registerBlock: (block: Block) => Block[];
   getChain: () => Block[];
   getLastBlock: () => Block;
   createNewTransaction: (
@@ -67,15 +69,14 @@ export class Blockchain implements IBlockchain {
     this.network = [];
 
     // create genesis block
-    this.mine();
+    // const genisisBlock: Block = this.mine();
+    // this.registerBlock(genisisBlock);
   }
 
   /**
-   * @description Create a new block and add it to the chain
+   * @description mine for a new block
    *
-   * @param {number} _nonce - the nonce value
-   * @param {string} _previousBlockHas - hash of the preceeding block (|| the most recent block)
-   * @param {number} _hash - hash of the new block
+   * @return {Block} newly created block
    */
   mine = (): Block => {
     const previousBlockHash: string =
@@ -96,10 +97,20 @@ export class Blockchain implements IBlockchain {
       nonce,
     };
 
+    return block;
+  };
+
+  /**
+   * @description push the given block into current node's chain
+   *
+   * @param {Block} block - block to be pushed
+   *
+   * @return {Block[]} updated blockchain
+   */
+  registerBlock = (block: Block): Block[] => {
     this.chain.push(block);
     this.pendingTransactions = [];
-
-    return block;
+    return this.chain;
   };
 
   /**
@@ -155,7 +166,10 @@ export class Blockchain implements IBlockchain {
   registerNewTransaction = (transaction: Transaction): number => {
     this.pendingTransactions.push(transaction);
 
-    return this.getLastBlock().index + 1;
+    return (
+      (isEmpty(this.getLastBlock()) ? { index: 0 } : this.getLastBlock())
+        .index + 1
+    );
   };
 
   hashBlockData = (data: string | number | object): string => {
