@@ -34,6 +34,7 @@ app.post(
     req: Request<{ transaction: Transaction }>,
     res: Response<{ blockIndex: number }>
   ): void => {
+    console.log(`registering new transaction ${req.body.transaction.id}`);
     // register the new transaction
     const blockIndex: number = blockchain.registerNewTransaction(
       req.body.transaction
@@ -64,15 +65,17 @@ app.post(
     let broadcastPromises: Promise<any>[] = [];
 
     // sync network nodes to have this, new, transaction
-    blockchain.network.map((node: string): void => {
-      broadcastPromises.push(
-        axios.post(
-          `${node}/blockchain/transaction`,
-          { transaction: newTransaction },
-          { headers: { "Content-Type": "application/json" } }
-        )
-      );
-    });
+    [...blockchain.network, blockchain.currentNodeURL].map(
+      (node: string): void => {
+        broadcastPromises.push(
+          axios.post(
+            `${node}/blockchain/transaction`,
+            { transaction: newTransaction },
+            { headers: { "Content-Type": "application/json" } }
+          )
+        );
+      }
+    );
 
     await Promise.all(broadcastPromises);
 

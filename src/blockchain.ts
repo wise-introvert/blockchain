@@ -142,8 +142,6 @@ export class Blockchain implements IBlockchain {
       timestamp: Date.now(),
     };
 
-    this.registerNewTransaction(newTransaction);
-
     return newTransaction;
   };
 
