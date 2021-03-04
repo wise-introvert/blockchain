@@ -1,4 +1,5 @@
 import { SHA256 } from "crypto-js";
+import { v4 } from "uuid";
 
 const _currentNodeURL: string = `${
   process.env.NODE_ENV === "development"
@@ -8,6 +9,7 @@ const _currentNodeURL: string = `${
 const powTarget: RegExp = /^(0000)[^0](.*)/gi;
 
 export interface Transaction {
+  id: string;
   amount: number;
   sender: string;
   recipient: string;
@@ -43,7 +45,8 @@ export interface IBlockchain {
     _amount: number,
     _sender: string,
     _recipient: string
-  ) => number;
+  ) => Transaction;
+  registerNewTransaction: (transaction: Transaction) => number;
   hashBlockData: (data: string | number | object) => string;
   proofOfWork: (blockData: Omit<Block, "hash" | "nonce">) => number;
   updateNetwork: (newNodeURL: string) => string[];
@@ -130,15 +133,30 @@ export class Blockchain implements IBlockchain {
     _amount: number,
     _sender: string,
     _recipient: string
-  ): number => {
+  ): Transaction => {
     const newTransaction: Transaction = {
+      id: v4().replace(/-/gi, "").toString(),
       amount: _amount,
       sender: _sender,
       recipient: _recipient,
       timestamp: Date.now(),
     };
 
-    this.pendingTransactions.push(newTransaction);
+    this.registerNewTransaction(newTransaction);
+
+    return newTransaction;
+  };
+
+  /**
+   * @description updates pending-transactions array with new transaction
+   *
+   * @param {Transaction} transaction - transaction to be pushed into the pending-transactions array
+   *
+   * @return {number} new-transaction's block-index
+   */
+  registerNewTransaction = (transaction: Transaction): number => {
+    this.pendingTransactions.push(transaction);
+
     return this.getLastBlock().index + 1;
   };
 

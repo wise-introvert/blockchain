@@ -31,18 +31,57 @@ app.get(
 app.post(
   "/blockchain/transaction",
   (
-    req: Request<{ transaction: Omit<Transaction, "timestamp"> }>,
+    req: Request<{ transaction: Transaction }>,
     res: Response<{ blockIndex: number }>
   ): void => {
-    const blockIndex: number = blockchain.createNewTransaction(
+    // register the new transaction
+    const blockIndex: number = blockchain.registerNewTransaction(
+      req.body.transaction
+    );
+
+    res
+      .status(StatusCodes.ACCEPTED)
+      .json({
+        blockIndex,
+      })
+      .end();
+  }
+);
+
+app.post(
+  "/blockchain/transaction/broadcast",
+  async (
+    req: Request<{ transaction: Omit<Transaction, "timestamp" | "id"> }>,
+    res: Response<{ blockIndex: number }>
+  ): Promise<void> => {
+    // create a transaction
+    const newTransaction: Transaction = blockchain.createNewTransaction(
       req.body.transaction.amount,
       req.body.transaction.sender,
       req.body.transaction.recipient
     );
 
-    res.status(StatusCodes.CREATED).json({
-      blockIndex,
+    let broadcastPromises: Promise<any>[] = [];
+
+    // sync network nodes to have this, new, transaction
+    blockchain.network.map((node: string): void => {
+      broadcastPromises.push(
+        axios.post(
+          `${node}/blockchain/transaction`,
+          { transaction: newTransaction },
+          { headers: { "Content-Type": "application/json" } }
+        )
+      );
     });
+
+    await Promise.all(broadcastPromises);
+
+    res
+      .status(StatusCodes.ACCEPTED)
+      .json({
+        blockIndex: blockchain.getLastBlock().index + 1,
+      })
+      .end();
   }
 );
 
