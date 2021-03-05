@@ -130,12 +130,17 @@ app.post(
 
 app.get(
   "/blockchain/mine/broadcast",
-  async (
-    req: Request<{}>,
-    res: Response<{ chain: Block[] }>
-  ): Promise<void> => {
+  async (_, res: Response<{ chain: Block[] }>): Promise<void> => {
     // prepare reward
-    blockchain.createNewTransaction(12.5, "00", thisNodeAddress);
+    const amount: number = 12.5,
+      sender: string = "00",
+      recipient: string = thisNodeAddress;
+
+    await axios.post(
+      `${blockchain.currentNodeURL}/blockchain/transaction/broadcast`,
+      { transaction: { amount, sender, recipient } },
+      { headers: { "Content-Type": "application/json" } }
+    );
 
     // mine the new block
     const newBlock: Block = blockchain.mine();
@@ -173,30 +178,74 @@ app.get(
 
 app.post(
   "/blockchain/mine",
-  (req: Request<{ block: Block }>, res: Response<{ chain: Block[] }>): void => {
-    // push the new block into the chain
-    blockchain.registerBlock(req.body.block);
+  (
+    req: Request<{ block: Block }>,
+    res: Response<{ chain: Block[] } | { error: string }>
+  ): void => {
+    if (blockchain.getChain().length === 0) {
+      // genisis block
+      // do not validate
+      blockchain.registerBlock(req.body.block);
 
-    res
-      .status(StatusCodes.ACCEPTED)
-      .json({
-        chain: blockchain.getChain(),
-      })
-      .end();
+      res
+        .status(StatusCodes.ACCEPTED)
+        .json({
+          chain: blockchain.getChain(),
+        })
+        .end();
+    } else {
+      const newBlock: Block = req.body.block;
+      const lastBlock: Block = blockchain.getLastBlock();
+
+      // validate the new block
+      const correctHash: boolean =
+        lastBlock.hash === newBlock.previousBlockHash;
+      const correctIndex: boolean = lastBlock.index + 1 === newBlock.index;
+      const isBlockValid: boolean = correctHash && correctIndex;
+
+      console.log({
+        hash: {
+          lastBlock: lastBlock.hash,
+          newBlock: newBlock.previousBlockHash,
+        },
+        index: { lastBlock: lastBlock.index, newBlock: newBlock.index },
+        isBlockValid,
+        correctHash,
+        correctIndex,
+      });
+
+      if (isBlockValid) {
+        console.log("inside if");
+        // push the new block into the chain
+        blockchain.registerBlock(req.body.block);
+
+        res
+          .status(StatusCodes.ACCEPTED)
+          .json({
+            chain: blockchain.getChain(),
+          })
+          .end();
+      } else {
+        console.log("inside else");
+        res
+          .status(StatusCodes.CONFLICT)
+          .json({
+            error: "Invalid block",
+          })
+          .end();
+      }
+    }
   }
 );
 
-app.get(
-  "/network",
-  (req: Request<{}>, res: Response<{ network: string[] }>): void => {
-    res
-      .status(StatusCodes.OK)
-      .json({
-        network: blockchain.network,
-      })
-      .end();
-  }
-);
+app.get("/network", (_, res: Response<{ network: string[] }>): void => {
+  res
+    .status(StatusCodes.OK)
+    .json({
+      network: blockchain.network,
+    })
+    .end();
+});
 
 app.post(
   "/network/broadcast",
